@@ -1,99 +1,91 @@
 # Tech Challenge 3 - Fine-Tuning Foundation Model
 
-Projeto de fine-tuning de um foundation model utilizando o dataset AmazonTitles-1.3MM para geração de descrições de produtos a partir de títulos.
+Fine-tuning do modelo **Phi-4-mini-instruct** (3.8B parâmetros) com **LoRA** no dataset **AmazonTitles-1.3MM** para geração de descrições de produtos a partir de títulos.
 
-## Objetivo
+**Resultado**: Dado um título de produto, o modelo gera descrições detalhadas no estilo Amazon.
 
-Executar fine-tuning de um foundation model (Llama, BERT, etc.) para que, dado o título de um produto, o modelo seja capaz de gerar sua descrição baseado no aprendizado obtido do dataset AmazonTitles-1.3MM.
+## Arquitetura
 
-## Estrutura do Projeto
+**Modelo**: Phi-4-mini-instruct (Microsoft, 3.8B parâmetros)  
+**Técnica**: LoRA - treina apenas 0.08% dos parâmetros (3.1M/3.8B)  
+**Dataset**: AmazonTitles-1.3MM - 3K amostras (2.7K treino / 300 validação)  
+**Hardware**: NVIDIA RTX 2000 Ada (16GB)  
+**Treinamento**: 2 épocas, ~60 minutos, loss 2.89→2.77
 
 ```
-.
-├── dataset/                          # Dataset AmazonTitles-1.3MM (trn.json)
-├── docs/                             # Documentação do projeto
-│   ├── tech-challenge.md            # Enunciado original
-│   └── plano-implementacao.md       # Plano detalhado de implementação
-├── tech_challenge_finetune.ipynb    # Notebook principal com todo o processo
-├── requirements.txt                  # Dependências Python
-├── README.md                         # Este arquivo
-└── .gitignore                        # Arquivos ignorados pelo Git
-```
+Dados Brutos (2.2M) → Limpeza (1.3M) → Amostra (3K) → Tokenização → LoRA Fine-Tuning → Modelo Especializado
+```## Instalação Rápida
 
-## Pré-requisitos
-
-- Python 3.9+
-- CUDA (recomendado para GPU)
-- 16GB+ RAM
-- 10GB+ espaço em disco
-
-## Instalação
-
-1. Clone o repositório:
 ```bash
-git clone <URL_DO_REPOSITORIO>
-cd TC-3
-```
-
-2. Crie um ambiente virtual:
-```bash
-python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# ou
-venv\Scripts\activate  # Windows
-```
-
-3. Instale as dependências:
-```bash
+git clone https://github.com/arthuribias-coder/tech-challenge-finetune.git
+cd tech-challenge-finetune
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-4. Baixe o dataset:
-- Download: [AmazonTitles-1.3MM](https://drive.google.com/file/d/12zH4mL2RX8iSvH0VCNnd3QxO4DzuHWnK/view)
-- Extraia o arquivo `trn.json` para o diretório `dataset/`
+**Dataset**: [Download AmazonTitles-1.3MM](https://drive.google.com/file/d/12zH4mL2RX8iSvH0VCNnd3QxO4DzuHWnK/view) → Extrair `trn.json` para `dataset/`
 
-## Uso
+**Requisitos**: Python 3.9+, GPU NVIDIA 12GB+, 16GB RAM
 
-1. Abra o Jupyter Notebook:
+## Como Usar
+
+**Treinamento completo** (~60 min):
+
 ```bash
 jupyter notebook tech_challenge_finetune.ipynb
+# Execute as células em ordem (1-32)
 ```
 
-2. Execute as células sequencialmente seguindo as instruções inline
+**Apenas inferência** (modelo já treinado):
 
-## Fluxo de Trabalho
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
-1. **Preparação do Dataset**: Carregamento e processamento do trn.json
-2. **Modelo Base**: Teste do modelo antes do fine-tuning
-3. **Fine-Tuning**: Treinamento com LoRA/PEFT
-4. **Avaliação**: Comparação antes/depois do fine-tuning
-5. **Demonstração**: Interface para testes interativos
+model = AutoModelForCausalLM.from_pretrained("./modelo_finetuned")
+tokenizer = AutoTokenizer.from_pretrained("microsoft/Phi-4-mini-instruct")
 
-## Tecnologias Utilizadas
+prompt = "Descreva o produto: Wireless Bluetooth Headphones\n\nDescrição:"
+inputs = tokenizer(prompt, return_tensors="pt")
+outputs = model.generate(**inputs, max_new_tokens=100)
+print(tokenizer.decode(outputs[0]))
+```
 
-- **PyTorch**: Framework de deep learning
-- **Transformers (Hugging Face)**: Modelos foundation
-- **PEFT**: Parameter-Efficient Fine-Tuning (LoRA)
-- **Pandas**: Manipulação de dados
-- **Datasets**: Processamento de datasets
+## Resultados
 
-## Modelo Foundation
+**Métricas**: Loss 2.891 → 2.772 (4.1% redução) | 2 épocas (~60 min) | 13 checkpoints | 3.1M parâmetros (0.08%)
 
-**Opção escolhida**: A ser definido durante implementação
-- Llama 3.2 (1B ou 3B)
-- BERT-base
-- DistilBERT
+**Antes**: ❌ Genérico | ❌ Alucinações | ❌ Irrelevante  
+**Depois**: ✅ Conciso | ✅ E-commerce style | ✅ Redução alucinações
 
-## Entregáveis
+**Exemplo**:
 
-- [ ] Código-fonte (este repositório)
-- [ ] Vídeo demonstrativo (máx. 10 minutos)
-- [ ] PDF com links (YouTube + GitHub)
+```
+Input: "Wireless Bluetooth Headphones with Noise Cancellation"
 
-## Licença
+Baseline: "A massa de Goodness Gracious Hula Lula Turkey 5 oz..." (confuso)
+Fine-tuned: "Premium wireless headphones featuring active noise cancellation..." (relevante)
+```
 
-Projeto acadêmico - Pós-Graduação
+## Tecnologias
 
-## Contato
+- **PyTorch 2.8.0** + **Transformers 4.49.0** (Hugging Face)
+- **PEFT 0.17.1** (LoRA)
+- **Accelerate 1.10.1** (otimização)
+- **Datasets 4.1.1** + **Pandas 2.3.3**
 
-Desenvolvido para o Tech Challenge - Fase 3
+## Troubleshooting
+
+**CUDA out of memory**: Reduza `BATCH_SIZE=1` ou `MAX_LENGTH=64`  
+**Treinamento lento**: Verifique GPU com `torch.cuda.is_available()`  
+**Tokenizer warning**: `os.environ["TOKENIZERS_PARALLELISM"] = "false"`
+
+## Referências
+
+- [Phi-4 Model Card](https://huggingface.co/microsoft/Phi-4-mini-instruct)
+- [LoRA Paper](https://arxiv.org/abs/2106.09685)
+- [PEFT Documentation](https://huggingface.co/docs/peft)
+- [AmazonTitles Dataset](https://github.com/xuyige/SIGIR2019-One2Set)
+
+---
+
+**Tech Challenge - Fase 3** | Pós-Graduação em Inteligência Artificial
