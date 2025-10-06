@@ -59,4 +59,5 @@ logs/
 # Temporary files
 temp/
 tmp/
+docs/
 debug-*
